@@ -9,7 +9,7 @@
 
 # Site settings
 title: wu的小博客 # ex. Trice的小博客
-name: wuyangfan # ex. CuiYiming
+name: wuyangfan # ex. WuYangfan
 email: yangfanwu027@gmail.com
 location: GuangZhou, China # ex. GuangZhou, China
 # company: MyCompany
@@ -107,10 +107,10 @@ kramdown:
 # If you want to add a new link that isn't here, you'll need to also edit the file _data/SocialNetworks.yml
 social-network-links:
   rss: true
-  email: "cuiyimingwhu@gmail.com"
+  email: "yangfanwu027@gmail.com"
   # facebook: yourname
   github: leno23
-  weibo: cuiyimingwhu
+  weibo: wuyangfan
   # twitter: yourname
 #  reddit: yourname
 #  google-plus: yourname
@@ -131,7 +131,7 @@ social-network-links:
 #livere
 livere: MTAyMC80NDQ1Ni8yMDk4OA== # data-uid ex. MTAyMC80NDQ1Ni8yMDk4O111
 # Disque
-# disque:  # ex. cuiyiming.disqus.com
+# disque:  # ex. WuYangfan.disqus.com
 
 # Pagination
 paginate: 10
@@ -145,7 +145,7 @@ analytics :
 
 
 # For about.html. Fell free to create your own!
-skill_software_keywords: [Java, Kotlin, C, C++, SQLite]
+skill_software_keywords: [Python,]
 # skill_j2ee_keywords: [Spring, Struct, Hibernet, MyBatis, JSP]
-skill_web_keywords: [HTML, CSS, JS]
-skill_mobile_app_keywords: [Android, Flutter, ReactNative]
+skill_web_keywords: [Vue, React, Nodejs]
+skill_mobile_app_keywords: [Flutter, ReactNative]
