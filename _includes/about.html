@@ -16,26 +16,13 @@
 
         <h2>Skill Keywords/技能树</h2>
 
-        {% if site.skill_software_keywords %}
+        {% if site.skill_web_keywords %}
         <div class="panel panel-default">
             <div class="panel-heading">
-                <h3 class="panel-title">Software Engineer Keywords</h3>
+                <h3 class="panel-title">Web Developer Keywords</h3>
             </div>
             <div class="panel-body">
-                {% for keyword in site.skill_software_keywords %}
-                <button class="btn btn-default" type="button">{{ keyword }}</button>
-                {% endfor %}
-            </div>
-        </div>
-        {% endif %}
-
-        {% if site.skill_j2ee_keywords %}
-        <div class="panel panel-default">
-            <div class="panel-heading">
-                <h3 class="panel-title">J2EE Developer Keywords</h3>
-            </div>
-            <div class="panel-body">
-                {% for keyword in site.skill_j2ee_keywords %}
+                {% for keyword in site.skill_web_keywords %}
                 <button class="btn btn-default" type="button">{{ keyword }}</button>
                 {% endfor %}
             </div>
@@ -55,13 +42,13 @@
         </div>
         {% endif %}
 
-        {% if site.skill_web_keywords %}
+        {% if site.skill_software_keywords %}
         <div class="panel panel-default">
             <div class="panel-heading">
-                <h3 class="panel-title">Web Developer Keywords</h3>
+                <h3 class="panel-title">Software Engineer Keywords</h3>
             </div>
             <div class="panel-body">
-                {% for keyword in site.skill_web_keywords %}
+                {% for keyword in site.skill_software_keywords %}
                 <button class="btn btn-default" type="button">{{ keyword }}</button>
                 {% endfor %}
             </div>
