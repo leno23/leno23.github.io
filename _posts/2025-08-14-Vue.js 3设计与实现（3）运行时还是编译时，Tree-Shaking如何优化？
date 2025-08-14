@@ -1,1 +1,59 @@
-Vue.js 3设计与实现（3）运行时还是编译时，Tree-Shaking如何优化？
+框架还需要考虑的是做成运行时、编译时还是运行时+编译时，前者对应React和Svelte。
+
+编译时，对应的是用户可以写模板，提供和HTML类型的写法；纯运行时，用户只能写渲染函数，提供灵活性（React创造了JSX，也可以写模板）
+
+
+Vue.js最终选择了后者。优点在于：因为有模板编译的步骤，框架可以根据用户的模板加入动态标记，给后面的更新提供优化。
+
+#### 运行时渲染的示例
+```
+const obj = {
+    tag: 'div',
+    children: [{ tag: 'span', children: 'hello ' }]
+  };
+  const Render = (obj, root) => {
+    const { tag, children } = obj;
+    let dom = document.createElement(tag);
+    if (Array.isArray(children)) {
+      for (let child of children) {
+        Render(child, dom);
+      }
+    } else if (typeof children === 'string') {
+      dom.textContent = children;
+    }
+    root.appendChild(dom);
+  };
+  const app1 = document.querySelector('#app1');
+  Render(obj, app1);
+  obj.tag = 'h2';
+  Render(obj, app1);
+```
+
+#### Tree-Shaking
+使用ESM管理模块时，才会有效
+  ```
+  //
+  // // input.js
+  // import { foo } from "./util";
+   // 标记foo函数没有副作用，是纯函数，可以正常进行Tree-Shaking，没有其他的依赖就可以视为Dead Code移除了
+  // /*#__PURE__*/ foo()
+
+  // // util.js
+  // export function foo(obj){
+  //     obj && obj.foo
+  // }
+  // export function bar(obj){
+  //     obj && obj.bar
+  // }
+
+  // vite@4.x  或以下
+  // npx vite build
+  // 打包结果内容为空
+```
+
+#### Vue的ESM类型的产物的使用场景
+```
+  // vue.esm-boundler.js    给打包工具用
+  // vue.esm-broswer.js    <script type="module"
+```
+
