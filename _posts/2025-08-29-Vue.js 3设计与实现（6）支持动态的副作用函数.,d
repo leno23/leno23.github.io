@@ -1,0 +1,331 @@
+
+  ```
+  // 上面的副作用函数时写死的，如何动态添加副作用函数
+  {
+    let data = { text: '文字块' }
+
+    let activeEffect
+    const effect = (fn) => {
+      activeEffect = fn
+      fn()
+    }
+    const bucket = new Set()
+
+    const obj = new Proxy(data, {
+      get(target, key) {
+        activeEffect && bucket.add(activeEffect)
+        return target[key]
+      },
+      set(target, key, val) {
+        target[key] = val
+        bucket.forEach(c => c())
+        return true
+      }
+    })
+
+
+    effect(() => {
+      let a = document.createElement('li')
+      a.innerText = obj.text
+      a.style.cssText = 'background:green;border-radius:4px;margin:3px'
+      document.body.appendChild(a)
+    })
+
+    setTimeout(() => {
+      obj.text = '文字块2'
+      obj.noExist = '111'    // 也触发了重新执行，原对象中没有这个属性
+    }, 1000)
+
+  }
+
+  console.log('问题： 添加对象设置别的key也会触发响应');
+  log('-----------------------------------------重新设计桶模型');
+
+  // target -- key -- effectFn
+  {
+    const bucket = new WeakMap()
+
+    const data = { text: 'bucket 2.0' }
+    const obj = new Proxy(data, {
+      get(target, key, val) {
+        if (!activeEffect) {
+          return target[key]
+        }
+        if (!bucket.get(target)) {
+          bucket.set(target, new Map())
+        }
+        let depsMap = bucket.get(target)
+        if (!depsMap.get(key)) {
+          depsMap.set(key, new Set())
+        }
+        let deps = depsMap.get(key)
+        deps.add(activeEffect)
+        return target[key]
+      },
+      set(target, key, val) {
+        target[key] = val
+        const depsMap = bucket.get(target)
+        if (!depsMap) return;
+        const effects = depsMap.get(key)
+        effects && effects.forEach(v => v())
+        return true
+      }
+    })
+    let activeEffect;
+    const effect = (fn) => {
+      activeEffect = fn
+      fn()
+    }
+    effect(() => {
+      let a = document.createElement('li')
+      a.innerText = obj.text
+      a.style.cssText = 'background:green;border-radius:4px;margin:3px'
+      document.body.appendChild(a)
+    })
+    setTimeout(() => {
+
+      obj.text = 'bucket 2.0--'
+      obj.noExist = '111' // 不会再触发，因为depsMap中找不到noExist对应的副作用集合
+    }, 1000)
+
+  }
+
+  log('---------------------------------------函数封装、分支切换和cleanup');
+
+  {
+    let activeEffect
+    const bucket = new WeakMap
+    const effect = (fn) => {
+      const effectFn = () => {
+        cleanup(effectFn)
+        activeEffect = effectFn
+        fn()
+      }
+      effectFn.deps = []
+      effectFn()
+    }
+    const track = (target, key) => {
+      if (!activeEffect) {
+        return target[key]
+      }
+
+      let depsMap = bucket.get(target)
+      if (!depsMap) {
+        bucket.set(target, (depsMap = new Map()))
+      }
+      let deps = depsMap.get(key)
+      if (!deps) {
+        depsMap.set(key, (deps = new Set()))
+      }
+      deps.add(activeEffect)
+      activeEffect.deps.push(deps)
+    }
+
+    const trigger = (target, key, val) => {
+      const depsMap = bucket.get(target)
+      if (!depsMap) return;
+      const effects = depsMap.get(key)
+      /*
+        此处如果遍历effects，会导致死循环
+        let s = new Set([1])
+        s.forEach(()=>{
+          // cleanup操作
+          s.delete(1)    
+          // 触发getter 后的 track操作
+          s.add(1)
+          为避免这个情况，可基于原数据单独定义新Set，遍历这个Set
+        })
+      
+      */
+
+      const effectsToRun = new Set(effects)
+      effectsToRun.forEach(v => v())
+    }
+    let data = { text: 'cleanup', ok: 1, foo: 1, bar: 1 }
+    const obj = new Proxy(data, {
+      get(target, key, val) {
+        track(target, key)
+        return target[key]
+      },
+      set(target, key, val) {
+        target[key] = val
+        trigger(target, key, val)
+        return true
+      }
+    })
+
+    const cleanup = (effectFn) => {
+      for (let deps of effectFn.deps) {
+        deps.delete(effectFn)
+      }
+      effectFn.deps.length = 0
+    }
+
+    effect(() => {
+      let a = document.createElement('li')
+      a.innerText = obj.ok ? obj.text : 'not'
+      a.style.cssText = 'background:green;border-radius:4px;margin:3px'
+      document.body.appendChild(a)
+    })
+    /*
+    {
+        {ok:true,text:'cleanup'}: {
+          ok: [effectFn],
+          text:[]
+        }
+    }
+    */
+
+    obj.ok = false
+    setTimeout(() => {
+      obj.text = 'cleanup2'
+    }, 1000)
+    let tmp;
+
+
+
+  }
+
+
+  log('---------------------------------------嵌套的effect与effect栈');
+  /*
+  在Vue内部，组件的渲染函数就是在一个effect中执行的
+  那么，当一个组件渲染了另外一个组件，例如
+  const Bar = {
+    render(){}
+  }
+  const Foo = {
+    render(){
+      return <Bar />
+    }
+  }
+  对应的effect函数调用是
+  effect(() => {
+    Foo().render()
+    effect(() => {
+      Bar().render()
+    }
+  })
+
+  effect(() => {
+    console.log('effect1执行');
+    effect(() => {
+      console.log('effect2执行');
+      obj.bar
+    })
+    obj.foo
+  })
+  无论修改obj.foo还是obj.bar  打印的都是 effect2执行
+  这是因为我们的activeEffect 全局变量只有一个，而嵌套函数，最内层函数最后执行，那么activeEffect永远指向的
+  都是内层的副作用函数。最终形成的 对应关系如下
+        bar --》  [内层effect]
+  obj 
+        foo --》  [内层effect]
+
+  因为effect是嵌套的，自然我们想到了用栈来记录，每一级的副作用函数
+  
+  */
+  {
+    let activeEffect;
+    const effectStack = []
+
+    const bucket = new WeakMap()
+    const effect = (fn) => {
+      const effectFn = () => {
+        cleanup(effectFn)
+        activeEffect = effectFn
+        effectStack.push(effectFn)
+        fn()
+        effectStack.pop()
+        activeEffect = effectStack[effectStack.length - 1]
+      }
+      // 初始化deps是空数组，依赖这个副作用的所有变量的deps
+      effectFn.deps = []
+      effectFn()
+    }
+
+    const track = (target, key) => {
+      if (!activeEffect) {
+        return target[key]
+      }
+
+      let depsMap = bucket.get(target)
+      if (!depsMap) {
+        bucket.set(target, (depsMap = new Map()))
+      }
+      let deps = depsMap.get(key)
+      if (!deps) {
+        depsMap.set(key, (deps = new Set()))
+      }
+      deps.add(activeEffect)
+      activeEffect.deps.push(deps)
+    }
+
+    const trigger = (target, key, val) => {
+      const depsMap = bucket.get(target)
+      if (!depsMap) return;
+      const effects = depsMap.get(key)
+      const effectsToRun = new Set()
+      effects && effects.forEach(effectFn => {
+        if (effectFn !== activeEffect) {
+          effectsToRun.add(effectFn)
+        }
+      })
+      effectsToRun.forEach(v => v())
+    }
+    let data = { text: 'cleanup', ok: 1, foo: 1, bar: 1 }
+    const obj = new Proxy(data, {
+      get(target, key, val) {
+        track(target, key)
+        return target[key]
+      },
+      set(target, key, val) {
+        target[key] = val
+        trigger(target, key, val)
+        return true
+      }
+    })
+
+    // 在当前effectFn依赖的 副作用Set列表中，移除当前的effectFn
+    const cleanup = (effectFn) => {
+      for (let deps of effectFn.deps) {
+        deps.delete(effectFn)
+      }
+      effectFn.deps.length = 0
+    }
+
+    // effect(() => {
+    //   console.log('2--effect1执行');
+    //   effect(() => {
+    //     console.log('2--effect2执行');
+    //     obj.bar
+    //   })
+    //   obj.foo
+    // })
+    // obj.foo = 3
+
+    // obj.bar = 3
+    console.log(bucket);
+
+    effect(() => {
+      console.log(123);
+
+      obj.bar++
+      /**
+      相当于 obj.bar = obj.bar + 1，初始化时 在effectFn中fn读取bar触发track方法后，触发trigger，因为当前副作用函数
+      还在执行，又再次触发了 副作用的执行，导致effectFn递归调用自己，产生栈溢出
+
+      添加判断，如果当前
+      */
+
+    })
+
+    obj.bar = 6
+  }
+
+  log('---------------------------------------调度执行');
+  log('---------------------------------------computed与watch的实现');
+
+
+</script>
+```
